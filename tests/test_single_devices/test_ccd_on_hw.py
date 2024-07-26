@@ -7,8 +7,6 @@ from loguru import logger
 
 from horiba_sdk.core.acquisition_format import AcquisitionFormat
 from horiba_sdk.core.clean_count_mode import CleanCountMode
-from horiba_sdk.core.gain import Gain
-from horiba_sdk.core.speed import Speed
 from horiba_sdk.core.timer_resolution import TimerResolution
 from horiba_sdk.core.x_axis_conversion_type import XAxisConversionType
 from horiba_sdk.devices.device_manager import DeviceManager
@@ -35,7 +33,7 @@ async def test_ccd_functionality(event_loop):  # noqa: ARG001
             temperature = await ccd.get_temperature()
             assert temperature < 0
 
-            _ignored_speed = await ccd.get_speed(Speed.SyncerityOE)
+            _ignored_speed = await ccd.get_speed_token()
 
             await ccd.set_acquisition_format(1, AcquisitionFormat.IMAGE)
             await ccd.set_region_of_interest()
@@ -85,18 +83,19 @@ async def test_ccd_speed(event_loop):  # noqa: ARG001
         await device_manager.start()
 
         async with device_manager.charge_coupled_devices[0] as ccd:
-            # act
-            await ccd.set_speed(Speed.SyncerityOE._45_KHZ)
-            speed_before = await ccd.get_speed(Speed.SyncerityOE)
+            speed_token_before = 0
+            speed_token_after = 1
 
-            await ccd.set_speed(Speed.SyncerityOE._1_MHZ)
-            speed_after = await ccd.get_speed(Speed.SyncerityOE)
+            # act
+            await ccd.set_speed(speed_token_before)
+            speed_before = await ccd.get_speed_token()
+
+            await ccd.set_speed(speed_token_after)
+            speed_after = await ccd.get_speed_token()
 
             # assert
-            assert speed_before == Speed.SyncerityOE._45_KHZ
-            assert speed_before != Speed.SynapsePlus._50_KHZ_HS
-            assert speed_after == Speed.SyncerityOE._1_MHZ
-            assert speed_after != Speed.SynapsePlus._50_KHZ_HS
+            assert speed_before == speed_token_before
+            assert speed_after == speed_token_after
     finally:
         await device_manager.stop()
 
@@ -109,18 +108,19 @@ async def test_ccd_gain(event_loop):  # noqa: ARG001
         await device_manager.start()
 
         async with device_manager.charge_coupled_devices[0] as ccd:
-            # act
-            await ccd.set_gain(Gain.SyncerityOE.HIGH_SENSITIVITY)
-            gain_before = await ccd.get_gain(Gain.SyncerityOE)
+            gain_token_before = 0
+            gain_token_after = 1
 
-            await ccd.set_gain(Gain.SyncerityOE.HIGH_LIGHT)
-            gain_after = await ccd.get_gain(Gain.SyncerityOE)
+            # act
+            await ccd.set_gain(gain_token_before)
+            gain_before = await ccd.get_gain_token()
+
+            await ccd.set_gain(gain_token_after)
+            gain_after = await ccd.get_gain_token()
 
             # assert
-            assert gain_before == Gain.SyncerityOE.HIGH_SENSITIVITY
-            assert gain_after == Gain.SyncerityOE.HIGH_LIGHT
-            assert gain_before != Gain.SynapsePlus.ULTIMATE_SENSITIVITY
-            assert gain_after != Gain.SynapsePlus.ULTIMATE_SENSITIVITY
+            assert gain_before == gain_token_before
+            assert gain_after == gain_token_after
     finally:
         await device_manager.stop()
 
@@ -138,8 +138,8 @@ async def test_ccd_resolution(event_loop):  # noqa: ARG001
             config = await ccd.get_configuration()
 
             # assert
-            assert resolution.width == int(config['ChipWidth'])
-            assert resolution.height == int(config['ChipHeight'])
+            assert resolution.width == int(config['chipWidth'])
+            assert resolution.height == int(config['chipHeight'])
     finally:
         await device_manager.stop()
 
@@ -336,15 +336,15 @@ async def test_ccd_clean_count(event_loop):  # noqa: ARG001
             expected_clean_count_after = 2
 
             # act
-            await ccd.set_clean_count(expected_clean_count_before, CleanCountMode.Mode1)
+            await ccd.set_clean_count(expected_clean_count_before, CleanCountMode.UNKNOWN)
             actual_clean_count_before = await ccd.get_clean_count()
 
-            await ccd.set_clean_count(expected_clean_count_after, CleanCountMode.Mode1)
+            await ccd.set_clean_count(expected_clean_count_after, CleanCountMode.UNKNOWN)
             actual_clean_count_after = await ccd.get_clean_count()
 
             # assert
-            assert actual_clean_count_before == expected_clean_count_before
-            assert actual_clean_count_after == expected_clean_count_after
+            assert actual_clean_count_before == (expected_clean_count_before, CleanCountMode.UNKNOWN)
+            assert actual_clean_count_after == (expected_clean_count_after, CleanCountMode.UNKNOWN)
     finally:
         await device_manager.stop()
 

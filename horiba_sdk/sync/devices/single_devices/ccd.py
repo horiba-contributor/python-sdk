@@ -1,4 +1,3 @@
-from enum import Enum
 from types import TracebackType
 from typing import Any, Optional, final
 
@@ -8,9 +7,7 @@ from overrides import override
 from horiba_sdk.communication import Response
 from horiba_sdk.core.acquisition_format import AcquisitionFormat
 from horiba_sdk.core.clean_count_mode import CleanCountMode
-from horiba_sdk.core.gain import GainType
 from horiba_sdk.core.resolution import Resolution
-from horiba_sdk.core.speed import SpeedType
 from horiba_sdk.core.timer_resolution import TimerResolution
 from horiba_sdk.core.x_axis_conversion_type import XAxisConversionType
 from horiba_sdk.icl_error import AbstractErrorDB
@@ -97,66 +94,53 @@ class ChargeCoupledDevice(AbstractDevice):
         response: Response = super()._execute_command('ccd_getConfig', {'index': self._id})
         return response.results['configuration']
 
-    def get_gain(self, gain_type: GainType) -> Enum:
-        """Returns the gain of the CCD
-
-        .. todo:: gain_type is temporary, as soon as we know all device types, this will be internal
-
-        Args:
-            gain_type (GainType): GainType type of the specific CCD model (i.e. Gain.SyncerityOE)
+    def get_gain_token(self) -> int:
+        """Returns the current gain token.
 
         Returns:
-            GainType: The gain of the gain_type
+            int: Gain token of the ccd
 
         Raises:
             Exception: When an error occurred on the device side
         """
         response: Response = super()._execute_command('ccd_getGain', {'index': self._id})
         gain: int = int(response.results['token'])
-        for member in gain_type:
-            if member.value == gain:
-                return member
-        raise Exception(f'Gain {gain} not found in {gain_type} enum')
+        return gain
 
-    def set_gain(self, gain: GainType) -> None:
+    def set_gain(self, gain_token: int) -> None:
         """Sets the gain of the CCD
 
         Args:
-            gain (GainType): Gain
+            gain_token (int): Token of the desired gain
 
         Raises:
             Exception: When an error occurred on the device side
         """
-        super()._execute_command('ccd_setGain', {'index': self._id, 'token': gain.value})
+        super()._execute_command('ccd_setGain', {'index': self._id, 'token': gain_token})
 
-    def get_speed(self, speed_type: SpeedType) -> Enum:
-        """Returns the speed of the CCD
-
-        .. todo:: speed_type is temporary, as soon as we know all device types, this will be internal
+    def get_speed_token(self) -> int:
+        """Returns the speed token.
 
         Returns:
-            Speed: Speed model of the specific CCD model (i.e. Speed.SyncerityOE)
+            int: Speed token of the CCD.
 
         Raises:
             Exception: When an error occurred on the device side
         """
         response: Response = super()._execute_command('ccd_getSpeed', {'index': self._id})
-        speed: int = int(response.results['token'])
-        for member in speed_type:
-            if member.value == speed:
-                return member
-        raise Exception(f'Speed {speed} not found in {speed_type} enum')
+        speed_token: int = int(response.results['token'])
+        return speed_token
 
-    def set_speed(self, speed: SpeedType) -> None:
+    def set_speed(self, speed_token: int) -> None:
         """Sets the speed of the CCD
 
         Args:
-            speed (Speed): Speed
+            speed_token (int): Token of the desired speed.
 
         Raises:
             Exception: When an error occurred on the device side
         """
-        super()._execute_command('ccd_setSpeed', {'index': self._id, 'token': speed.value})
+        super()._execute_command('ccd_setSpeed', {'index': self._id, 'token': speed_token})
 
     def get_fit_parameters(self) -> list[int]:
         """Returns the fit parameters of the CCD
@@ -168,7 +152,7 @@ class ChargeCoupledDevice(AbstractDevice):
             Exception: When an error occurred on the device side
         """
         response: Response = super()._execute_command('ccd_getFitParams', {'index': self._id})
-        fit_params: list[int] = [int(x) for x in response.results['params'].split(',')]
+        fit_params: list[int] = response.results['fitParameters']
         return fit_params
 
     def set_fit_parameters(self, fit_params: list[int]) -> None:
@@ -193,14 +177,8 @@ class ChargeCoupledDevice(AbstractDevice):
             Exception: When an error occurred on the device side
         """
         response: Response = super()._execute_command('ccd_getTimerResolution', {'index': self._id})
-        timer_resolution: int = int(response.results['resolution'])
-        # TODO: this is temporary, as soon as the resolution is returned as 0,1 we can remove this
-        if timer_resolution == 1000:
-            return TimerResolution._1000_MICROSECONDS
-        elif timer_resolution == 1:
-            return TimerResolution._1_MICROSECOND
-        else:
-            raise Exception(f'Unknown timer resolution {timer_resolution}')
+        timer_resolution: int = int(response.results['resolutionToken'])
+        return TimerResolution(timer_resolution)
 
     def set_timer_resolution(self, timer_resolution: TimerResolution) -> None:
         """Sets the timer resolution of the CCD
@@ -213,7 +191,9 @@ class ChargeCoupledDevice(AbstractDevice):
         Raises:
             Exception: When an error occurred on the device side
         """
-        super()._execute_command('ccd_setTimerResolution', {'index': self._id, 'resolution': timer_resolution.value})
+        super()._execute_command(
+            'ccd_setTimerResolution', {'index': self._id, 'resolutionToken': timer_resolution.value}
+        )
 
     def set_acquisition_format(self, number_of_rois: int, acquisition_format: AcquisitionFormat) -> None:
         """Sets the acquisition format and the number of ROIs (Regions of Interest) or areas.
@@ -312,7 +292,13 @@ class ChargeCoupledDevice(AbstractDevice):
         return int(response.results['count'])
 
     def get_clean_count(self) -> tuple[int, CleanCountMode]:
-        """Gets the clean count mode of the CCD and the according mode"""
+        """Gets the number of cleans to be performed prior to measurement.
+
+        Returns:
+            Tuple[int, CleanCountMode]:
+                count: Number of cleans,
+                mode: Specifies how the cleans will be performed.
+        """
         response: Response = super()._execute_command('ccd_getCleanCount', {'index': self._id})
         count: int = int(response.results['count'])
         mode: CleanCountMode = CleanCountMode(response.results['mode'])
@@ -453,17 +439,17 @@ class ChargeCoupledDevice(AbstractDevice):
             )
             return
 
-        found_triggers = [trigger for trigger in self._config['Triggers'] if trigger['Token'] == address]
+        found_triggers = [trigger for trigger in self._config['triggers'] if trigger['token'] == address]
         if not found_triggers:
             raise Exception(f'Trigger address {address} not found in the configuration')
 
         found_events = [
-            trigger_event for trigger_event in found_triggers[0]['Events'] if trigger_event['Token'] == event
+            trigger_event for trigger_event in found_triggers[0]['events'] if trigger_event['token'] == event
         ]
         if not found_events:
             raise Exception(f'Trigger event {event} not found in the configuration')
 
-        found_signal_types = [signal for signal in found_events[0]['Types'] if signal['Token'] == signal_type]
+        found_signal_types = [signal for signal in found_events[0]['types'] if signal['token'] == signal_type]
         if not found_signal_types:
             raise Exception(f'Trigger signal type {signal_type} not found in the configuration')
 
@@ -529,17 +515,17 @@ class ChargeCoupledDevice(AbstractDevice):
             )
             return
 
-        found_triggers = [trigger for trigger in self._config['Signals'] if trigger['Token'] == address]
+        found_triggers = [trigger for trigger in self._config['signals'] if trigger['token'] == address]
         if not found_triggers:
             raise Exception(f'Signal address {address} not found in the configuration')
 
         found_events = [
-            trigger_event for trigger_event in found_triggers[0]['Events'] if trigger_event['Token'] == event
+            trigger_event for trigger_event in found_triggers[0]['events'] if trigger_event['token'] == event
         ]
         if not found_events:
             raise Exception(f'Signal event {event} not found in the configuration')
 
-        found_signal_types = [signal for signal in found_events[0]['Types'] if signal['Token'] == signal_type]
+        found_signal_types = [signal for signal in found_events[0]['types'] if signal['token'] == signal_type]
         if not found_signal_types:
             raise Exception(f'Signal type {signal_type} not found in the configuration')
 
