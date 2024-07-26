@@ -28,15 +28,7 @@ class Command:
 
 
     def json(self) -> str:
-        with open('output.txt', 'a') as f:
-            f.write('\n')
-            f.write(str(self.command))
-            f.write('\n')
-            f.write(str(type(self.command)))
-            f.write('\n')
-            f.write(str(self.parameters))
-            f.write('\n')
-            f.write(str(type(self.parameters)))
+
         """Converts the command object to a JSON string."""
         return json.dumps({'id': self.id, 'command': self.command, 'parameters': self.parameters})
 
