@@ -36,8 +36,6 @@ async def main():
         await wait_for_mono(mono)
 
         # ccd configuration
-        await ccd.restart()
-        await asyncio.sleep(5)
         await ccd.set_acquisition_format(1, AcquisitionFormat.SPECTRA)
         await ccd.set_acquisition_count(1)
         await ccd.set_x_axis_conversion_type(XAxisConversionType.FROM_ICL_SETTINGS_INI)
