@@ -31,18 +31,21 @@ async def main():
         await mono.home()
         await wait_for_mono(mono)
 
-        target_wavelength = 600.0
+        target_wavelength = 585.25
         await mono.move_to_target_wavelength(target_wavelength)
         await wait_for_mono(mono)
+        await mono.set_turret_grating(mono.Grating.SECOND)
+        await wait_for_mono(mono)
+
 
         # ccd configuration
         await ccd.set_acquisition_format(1, AcquisitionFormat.SPECTRA)
         await ccd.set_acquisition_count(1)
         await ccd.set_x_axis_conversion_type(XAxisConversionType.FROM_ICL_SETTINGS_INI)
         await ccd.set_timer_resolution(TimerResolution.MILLISECONDS)
-        await ccd.set_exposure_time(1000)
+        await ccd.set_exposure_time(500)
         await ccd.set_region_of_interest()  # Set default ROI, if you want a custom ROI, pass the parameters
-        await ccd.set_center_wavelength(600)
+        await ccd.set_center_wavelength(target_wavelength)
         xy_data = [[0], [0]]
 
         if await ccd.get_acquisition_ready():
@@ -75,7 +78,7 @@ async def main():
     finally:
         await ccd.close()
         logger.info('Waiting before closing Monochromator')
-        await asyncio.sleep(15)
+        await asyncio.sleep(1)
         await mono.close()
 
     await device_manager.stop()
